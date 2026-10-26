@@ -33,11 +33,11 @@ int main(int argc, char **argv)
   parse_command_line(argc, argv);
  
   if(cli::trace_checking){
+    
     if(cli::check_safety || cli::check_cosafety){
-      property_check();
-      //return tracecheck_alt;
+      return property_check();
     }
-        
+    
     return trace_check();
   }
   

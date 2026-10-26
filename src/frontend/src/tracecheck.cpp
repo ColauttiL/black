@@ -24,6 +24,7 @@
 #include <black/frontend/tracecheck.hpp>
 #include <black/frontend/io.hpp>
 #include <black/frontend/support.hpp>
+#include <black/frontend/trace.hpp>
 
 #include <black/logic/logic.hpp>
 #include <black/logic/parser.hpp>
@@ -43,6 +44,7 @@ using json = nlohmann::json;
 
 namespace black::frontend 
 {
+  
   using state_t = std::map<std::string, black::tribool>;
 
   struct trace_t {
@@ -189,28 +191,28 @@ namespace black::frontend
     return !cli::finite || t < trace.states.size();
   }
 
-  struct check_lookup {
-    formula f;
-    size_t t;
+  // struct check_lookup {
+  //   formula f;
+  //   size_t t;
 
-    friend bool operator==(check_lookup const&, check_lookup const&) = default;
-  };
+  //   friend bool operator==(check_lookup const&, check_lookup const&) = default;
+  // };
 
-  } namespace std {
+  //} namespace std {
 
-    template<>
-    struct hash<black::frontend::check_lookup> {
-      size_t operator()(black::frontend::check_lookup l) const {
-        using namespace black_internal;
-        using namespace black;
-        size_t h1 = std::hash<formula>{}(l.f);
-        size_t h2 = std::hash<size_t>{}(l.t);
+    // template<>
+    // struct hash<black::frontend::check_lookup> {
+    //   size_t operator()(black::frontend::check_lookup l) const {
+    //     using namespace black_internal;
+    //     using namespace black;
+    //     size_t h1 = std::hash<formula>{}(l.f);
+    //     size_t h2 = std::hash<size_t>{}(l.t);
 
-        return hash_combine(h1, h2);
-      }
-    };
+    //     return hash_combine(h1, h2);
+    //   }
+    // };
 
-  } namespace black::frontend {
+  //} namespace black::frontend {
 
   static
   bool check(trace_t trace, formula f, size_t t) 
