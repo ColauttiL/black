@@ -45,53 +45,53 @@ using json = nlohmann::json;
 namespace black::frontend 
 {
   
-  using state_t = std::map<std::string, black::tribool>;
+  // using state_t = std::map<std::string, black::tribool>;
 
-  struct trace_t {
-    std::optional<std::string> result;
-    size_t loop = 0;
-    std::vector<state_t> states;
-    std::optional<formula> muc;
-  };
+  // struct trace_t {
+  //   std::optional<std::string> result;
+  //   size_t loop = 0;
+  //   std::vector<state_t> states;
+  //   std::optional<formula> muc;
+  // };
 
-  static bool check(trace_t, formula, size_t);
+  //static bool check(trace_t, formula, size_t);
 
-  static
-  std::optional<state_t> state_at(trace_t trace, size_t t) {
-    if(t < trace.loop)
-      return trace.states[t];
+  // static
+  // std::optional<state_t> state_at(trace_t trace, size_t t) {
+  //   if(t < trace.loop)
+  //     return trace.states[t];
     
-    size_t period = trace.states.size() - trace.loop;
+  //   size_t period = trace.states.size() - trace.loop;
 
-    if(period)
-      return trace.states[((t - trace.loop) % period) + trace.loop];
+  //   if(period)
+  //     return trace.states[((t - trace.loop) % period) + trace.loop];
     
-    black_assert(t >= trace.states.size());
-    return {};
-  }
+  //   black_assert(t >= trace.states.size());
+  //   return {};
+  // }
 
-  static
-  bool check_proposition(trace_t trace, proposition a, size_t t) {
-    black_assert(a.name().to<std::string>().has_value());
-    std::string p = *a.name().to<std::string>();
+  // static
+  // bool check_proposition(trace_t trace, proposition a, size_t t) {
+  //   black_assert(a.name().to<std::string>().has_value());
+  //   std::string p = *a.name().to<std::string>();
 
-    std::optional<state_t> state = state_at(trace, t);
+  //   std::optional<state_t> state = state_at(trace, t);
     
-    // all the states at the end of a non-looping model are
-    // full of don't cares so we return true (we may choose false as well)
-    if(!state.has_value())
-      return true;
+  //   // all the states at the end of a non-looping model are
+  //   // full of don't cares so we return true (we may choose false as well)
+  //   if(!state.has_value())
+  //     return true;
       
-    auto it = state->find(p);
-    if(it == state->end())
-      return true;
+  //   auto it = state->find(p);
+  //   if(it == state->end())
+  //     return true;
     
-    black::tribool value = it->second;
-    if(value == true || value == black::tribool::undef)
-      return true;
+  //   black::tribool value = it->second;
+  //   if(value == true || value == black::tribool::undef)
+  //     return true;
 
-    return false;
-  }
+  //   return false;
+  // }
 
   static
   std::optional<size_t>
@@ -103,24 +103,24 @@ namespace black::frontend
     return {};
   }
 
-  static
-  std::optional<size_t>
-  find_one_reverse(trace_t trace, formula f, size_t begin, size_t end) {
-    for(ssize_t i = (ssize_t)begin; i >= (ssize_t)end; --i) {
-      if(check(trace, f, (size_t)i))
-        return i;
-    }
-    return {};
-  }
+  // static
+  // std::optional<size_t>
+  // find_one_reverse(trace_t trace, formula f, size_t begin, size_t end) {
+  //   for(ssize_t i = (ssize_t)begin; i >= (ssize_t)end; --i) {
+  //     if(check(trace, f, (size_t)i))
+  //       return i;
+  //   }
+  //   return {};
+  // }
 
-  static
-  bool check_for_all(trace_t trace, formula f, size_t begin, size_t end) {
-    for(size_t i = begin; i < end; ++i) {
-      if(!check(trace, f, i))
-        return false;
-    }
-    return true;
-  }
+  // static
+  // bool check_for_all(trace_t trace, formula f, size_t begin, size_t end) {
+  //   for(size_t i = begin; i < end; ++i) {
+  //     if(!check(trace, f, i))
+  //       return false;
+  //   }
+  //   return true;
+  // }
 
   static
   size_t depth(formula f) {
@@ -171,20 +171,20 @@ namespace black::frontend
     return check_for_all(trace, l, t, *rindex);
   }
 
-  static
-  bool check_since(trace_t trace, since s, size_t t) {
-    formula l = s.left();
-    formula r = s.right();
+  // static
+  // bool check_since(trace_t trace, since s, size_t t) {
+  //   formula l = s.left();
+  //   formula r = s.right();
     
-    // search for 'r'
-    std::optional<size_t> rindex = find_one_reverse(trace, r, t, 0);
+  //   // search for 'r'
+  //   std::optional<size_t> rindex = find_one_reverse(trace, r, t, 0);
 
-    if(!rindex.has_value())
-      return false; // we didn't find 'r', the formula is false
+  //   if(!rindex.has_value())
+  //     return false; // we didn't find 'r', the formula is false
 
-    // check 'l' in all positions until 'r'
-    return check_for_all(trace, l, *rindex + 1, t + 1);
-  }
+  //   // check 'l' in all positions until 'r'
+  //   return check_for_all(trace, l, *rindex + 1, t + 1);
+  // }
 
   static
   bool state_exists(trace_t trace, size_t t) {
@@ -365,7 +365,7 @@ namespace black::frontend
         io::fatal(status_code::syntax_error, "{}: empty model", path);
 
       for(json jstate : model["states"]) {
-        std::map<std::string, black::tribool> state;
+        std::map<std::string, ValueType> state;
 
         for(auto it = jstate.begin(); it != jstate.end(); ++it) {
           black::tribool value = black::tribool::undef;
