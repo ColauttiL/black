@@ -47,24 +47,27 @@ using json = nlohmann::json;
 namespace black::frontend 
 {
 
-  using ValueType = std::variant<black::tribool, int, float>;
-  using state_t = std::map<std::string, ValueType>;
+  using ValueType = std::variant<black::tribool, int, double>;
+  using state_t1 = std::map<std::string, ValueType>;
   
   struct trace_t1 {
     std::optional<std::string> result;
     size_t loop = 0;
-    std::vector<state_t> states;
+    std::vector<state_t1> states;
     std::optional<formula> muc;
   };
 
   static bool check(trace_t1, formula, size_t);
 
-
   bool is_pure_past(formula f, int i) { 
+    
+    //bool result = f.match(
     return f.match(
       [](boolean) { return true; },
       [&](proposition) { return true; },
-      [&](atom) -> bool { return true; },
+      [&](atom) -> bool { 
+        command_line_error("atoms are not supported by the LIA and the LRA quantifier-free theories");
+        quit(status_code::command_line_error); },
       [&](quantifier) -> bool { 
         command_line_error("the --safety and --cosafety options do not accept quantifiers)");
         quit(status_code::command_line_error); },
@@ -92,7 +95,7 @@ namespace black::frontend
     );
   }
 
-  
+
   static 
   trace_t1 parse_trace(
     alphabet &sigma, 
@@ -160,12 +163,10 @@ namespace black::frontend
               black::tribool bool__val = false;
               value = bool__val;
             }
-            
           } catch(std::exception& e) {
             try{ 
               int it_value = it.value().get<int>();
-              
-              if(cli::default_sort == "real")
+              if(cli::default_sort == "Real")
                 io::fatal(
                   status_code::syntax_error, 
                   "{}: found integer value in real domain",
@@ -175,7 +176,8 @@ namespace black::frontend
               value = it_value;
             }catch(std::exception& e) {
               try{
-                float it_value = it.value().get<float>();  
+                double it_value = it.value().get<double>();  
+                
                 if(cli::default_sort == "Int")
                   io::fatal(
                     status_code::syntax_error, 
@@ -196,7 +198,8 @@ namespace black::frontend
           
           state.insert({it.key(), value});
         }
-        trace.states.push_back(state);
+        //trace.states.push_back(state);
+        trace.states.insert(trace.states.begin(),state);
       }
 
       if(model["size"] != trace.states.size()) {
@@ -223,12 +226,74 @@ namespace black::frontend
   }
 
   static
-  std::optional<state_t> state_at(trace_t1 trace, size_t t) {
+  std::optional<state_t1> state_at(trace_t1 trace, size_t t) {
+    // if(t < trace.loop)
+    //   return trace.states[t];
     
+    // size_t period = trace.states.size() - trace.loop;
+
+    // if(period)
+    //   return trace.states[((t - trace.loop) % period) + trace.loop];
+    
+    // black_assert(t >= trace.states.size());
     if(t >= trace.states.size())
       return {};
 
     return trace.states[t];
+  }
+
+  
+  static
+  ValueType check_eq_comp_proposition(trace_t1 trace, std::string p, size_t t) {
+    std::optional<state_t1> state = state_at(trace, t);
+   
+    // all the states at the end of a non-looping model are
+    // full of don't cares so we return true (we may choose false as well)
+    if(!state.has_value()){
+      return true;
+    }
+      
+    auto it = state->find(p);
+
+    if(it == state->end()){   
+      return true;
+    }
+
+    ValueType value = it->second;  
+    try{
+      if(get<black::tribool>(value)){
+        io::fatal(
+          status_code::syntax_error, 
+          "unable to find a numerical value of the requested variable"
+        ); 
+      }
+
+    }catch(std::exception& e) {
+      try{
+        if(get<int>(value)){
+          int int_value = get<int>(value);
+          return int_value;
+        }
+      } catch(std::exception& e){
+        try{
+          if(get<double>(value)){
+            double double_value = get<double>(value);
+            return double_value;
+          }
+        } catch(std::exception& e){
+          io::fatal(
+            status_code::syntax_error, 
+            "invalid proposition value"
+          );
+        }
+
+      }
+    }
+    io::fatal(
+      status_code::syntax_error, 
+      "unrecognized proposition value"
+    );
+
   }
 
 
@@ -237,8 +302,7 @@ namespace black::frontend
     black_assert(a.name().to<std::string>().has_value());
     std::string p = *a.name().to<std::string>();
 
-
-    std::optional<state_t> state = state_at(trace, t);
+    std::optional<state_t1> state = state_at(trace, t);
    
     // all the states at the end of a non-looping model are
     // full of don't cares so we return true (we may choose false as well)
@@ -252,11 +316,12 @@ namespace black::frontend
       return true;
     }
 
-    ValueType value = it->second;  
+    ValueType value = it->second;  // si suppone che le  var a se stanti siano bool
 
     try{
       black::tribool trib_val = get<black::tribool>(value);
-
+      
+      
       if(trib_val == black::tribool::undef){
         return true;
       }
@@ -275,22 +340,20 @@ namespace black::frontend
       );
       // try{
       //   if(get<int>(value))
-      //    ...;
+      //     ...
       // } catch(std::exception& e){
-      //     
+      //     ...
       //   try{
-      //     if(get<float>(value))
-      //       ...;
+      //     if(get<double>(value))
+      //       ...
       //   } catch(std::exception& e){
       //     io::fatal(
       //       status_code::syntax_error, 
       //       "invalid proposition value"
       //     );
       //   }
-
       // }
     }
-
     return false;
   }
    
@@ -329,7 +392,6 @@ namespace black::frontend
     return check_for_all(trace, l, *rindex + 1, t + 1);
   }
 
-
   static int check(trace_t1 trace, formula f) {
 
     size_t initial_state = 0;
@@ -348,6 +410,117 @@ namespace black::frontend
   }
 
 
+  auto check_term_value(trace_t1 trace, term term, size_t t){
+    auto value = term.match(
+      [&](variable, identifier id){
+        if (id.to<std::string>()){
+          std::string var_id = id.to<std::string>().value();
+          ValueType value = check_eq_comp_proposition(trace, var_id, t);
+          if (cli::default_sort == "Int" || cli::default_sort == "int"){
+            int int_value = get<int>(value);
+            return int_value;
+          } else if(cli::default_sort == "Real" || cli::default_sort == "real"){
+            int double_value = get<double>(value);
+            return double_value;
+          } else { 
+            io::fatal(
+              status_code::syntax_error, "found an unexpected sort"
+            );
+          }
+        }
+        else { 
+          io::fatal(
+            status_code::syntax_error, "could not find the variable identifier"
+          );
+        }
+      },
+      [&](constant, number n){
+        auto res = n.match(
+          [&](integer i){
+            int int_value = i.value();
+            return int_value;
+          },
+          [&](real r){
+            double double_value = r.value();
+            return double_value;
+          }
+        );
+        return res;
+      }
+    );
+
+    return value;
+    
+  }
+
+
+  bool check_equality(trace_t1 trace, equality e, size_t t){
+  
+    bool result = e.match(
+      [&](equal, auto terms) {  
+        int terms_size = terms.size();
+        auto first_value = 0;
+
+        for(int i = 0; i< terms_size; i++ ){
+          auto value = check_term_value(trace, terms[i], t);
+
+          if(i == 0){
+            first_value = value; // if it's the first cycle, initialize the variable with the first number
+          } else {
+            if (first_value != value ) {
+              return false;
+            }
+          }
+        }
+        return true;
+      },
+      [&](distinct, auto terms) {  
+        int terms_size = terms.size();
+        auto first_value = 0;
+
+        for(int i = 0; i< terms_size; i++ ){
+          auto value = check_term_value(trace, terms[i], t);
+
+          if(i == 0){
+            first_value = value; // if it's the first cycle, initialize the variable with the first number
+          } else {
+            if (first_value != value ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+    );
+    return result;
+  }
+
+  
+  bool check_comparison(trace_t1 trace, comparison c, size_t t){
+    return c.match(
+      [&](less_than, term l, term r) { 
+        auto l_value = check_term_value(trace, l, t);
+        auto r_value = check_term_value(trace, r, t);
+        return l_value < r_value; 
+      },
+      [&](less_than_equal, term l, term r) {
+        auto l_value = check_term_value(trace, l, t);
+        auto r_value = check_term_value(trace, r, t);
+        return l_value <= r_value; 
+      },
+      [&](greater_than, term l, term r) {
+        auto l_value = check_term_value(trace, l, t);
+        auto r_value = check_term_value(trace, r, t);
+        return l_value > r_value; 
+      },
+      [&](greater_than_equal, term l, term r) {
+        auto l_value = check_term_value(trace, l, t);
+        auto r_value = check_term_value(trace, r, t);
+        return l_value >= r_value;
+      }
+     );
+  }
+
   static bool check(trace_t1 trace, formula f, size_t t) 
   {
     static std::unordered_map<check_lookup, bool> memo;
@@ -361,15 +534,17 @@ namespace black::frontend
       [&](proposition a) {
         return check_proposition(trace, a, t);
       },
-      [&](atom ) -> bool { black_unreachable(); },  
-      [&](equality) -> bool { black_unreachable(); }, 
-      [&](comparison) -> bool { black_unreachable(); }, 
+      [&](equality e) -> bool { return check_equality(trace, e, t); }, 
+      [&](comparison c) -> bool { return check_comparison(trace, c, t); }, 
       [&](yesterday, formula op) {
-        return t > 0 && check(trace, op, t - 1); 
+        return t > 0 && check(trace, op, t - 1); // +1 because the trace is reversed
       },
       [&](w_yesterday, formula op) {
-        return t == 0 || check(trace, op, t - 1);
+        return t == 0 || check(trace, op, t + 1);
       },
+      // [&](until u) {
+      //   return check_until(trace, u, t);
+      // },
       [&](since s) {
         return check_since(trace, s, t);
       },
@@ -462,7 +637,6 @@ namespace black::frontend
         quit(status_code::failed_check);
       }
     }
-
 
     if(trace.states.size() == 0){
       quit(status_code::success);
