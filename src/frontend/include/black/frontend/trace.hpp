@@ -34,7 +34,7 @@
 
 namespace black::frontend 
 {
-  using ValueType = std::variant<black::tribool, int, double>;
+  using ValueType = std::variant<black::tribool, double, int>;
   using state_t = std::map<std::string, ValueType>;
   
   struct trace_t {

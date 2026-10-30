@@ -108,13 +108,13 @@ namespace black::frontend
       [&](until) { return false; },
       [&](w_until) { return false; },
       [&](since, formula l, formula r) { return is_pure_past(l, i+1) && is_pure_past(r, i+1); },
-      [&](negation, formula op) { printf("neg \n"); return is_pure_past(op, i); }, 
+      [&](negation, formula op) { return is_pure_past(op, i); }, 
       [&](conjunction, formula l, formula r) { return is_pure_past(l, i+1) && is_pure_past(r, i+1); },
       [&](disjunction, formula l, formula r) { return is_pure_past(l, i+1) && is_pure_past(r, i+1); },
       [&](implication, formula l, formula r) { return is_pure_past(l, i+1) && is_pure_past(r, i+1); },
       [&](iff, formula l, formula r) { return is_pure_past(l, i+1) && is_pure_past(r, i+1); },
-      [&](eventually, formula op) { printf("event \n"); return (i==0 && is_pure_past(op, i+1)); }, 
-      [&](always, formula op) { printf("alway \n"); return i==0 && is_pure_past(op, i+1); },
+      [&](eventually, formula op) { return (i==0 && is_pure_past(op, i+1)); }, 
+      [&](always, formula op) { return i==0 && is_pure_past(op, i+1); },
       [&](release, formula, formula) { return false; },
       [&](s_release, formula, formula) { return false; },
       [&](once, formula op) { return is_pure_past(op, i+1); },
@@ -152,15 +152,12 @@ namespace black::frontend
       try{
         if(get<int>(value)){
           int int_value = get<int>(value);
-          printf("found int value\n");
           return int_value;
         }
       } catch(std::exception& e){
-          printf("try double\n");
         try{
           if(get<double>(value)){
             double double_value = get<double>(value);
-            printf("found double value\n");
             return double_value;
           }
         } catch(std::exception& e){
@@ -179,21 +176,17 @@ namespace black::frontend
 
   }
 
-  auto check_term_value(trace_t trace, term term, size_t t){
+  double check_term_value(trace_t trace, term term, size_t t){
     auto value = term.match(
       [&](variable, identifier id){
         if (id.to<std::string>()){
           std::string var_id = id.to<std::string>().value();
           ValueType value = check_numerical_proposition(trace, var_id, t);
           if (cli::default_sort == "Int" || cli::default_sort == "int"){
-            int int_value = get<int>(value);
-            
-            //io::println("int var val: {}\n", int_value); 
+            double int_value = get<int>(value); 
             return int_value;
           } else if(cli::default_sort == "Real" || cli::default_sort == "real"){
-            int double_value = get<double>(value);
-            
-            //io::println("real var val: {}\n", double_value); 
+            double double_value = get<double>(value);
             return double_value;
           } else { 
             io::fatal(
@@ -210,17 +203,58 @@ namespace black::frontend
       [&](constant, number n){
         auto res = n.match(
           [&](integer i){
+            // if(cli::default_sort == "Real" || cli::default_sort == "real"){
+            //   io::fatal(
+            //     status_code::syntax_error, 
+            //     "{}: found integer constant in real domain",
+            //     path
+            //   );
+            // }
             int int_value = i.value();
-            io::println("constant int value: {}\n", int_value);
             return int_value;
           },
           [&](real r){
+            if(cli::default_sort == "Int" || cli::default_sort == "int"){
+              io::fatal(
+                status_code::syntax_error, 
+                "found real constant in Int domain"
+              );
+            }
             double double_value = r.value();
-            io::println("constant real value: {}\n", double_value);
             return double_value;
           }
         );
         return res;
+      },
+      [&](negative, auto n){
+        double term_value = check_term_value(trace, n, t);  
+        return -term_value;
+      },
+      //[&](unary_term ){ },
+      [&](addition, auto l, auto r){
+        double l_value = check_term_value(trace, l, t);
+        double r_value = check_term_value(trace, r, t);  
+        return l_value + r_value;
+      },
+      [&](subtraction, auto l, auto r){
+        double l_value = check_term_value(trace, l, t);
+        double r_value = check_term_value(trace, r, t);  
+        return l_value - r_value;
+      },
+      [&](multiplication, auto l, auto r){
+        double l_value = check_term_value(trace, l, t);
+        double r_value = check_term_value(trace, r, t);  
+        return l_value * r_value;
+      },
+      [&](division, auto l, auto r){
+        double l_value = check_term_value(trace, l, t);
+        double r_value = check_term_value(trace, r, t);  
+        return l_value / r_value;
+      },
+      [&](int_division, auto l, auto r){
+        double l_value = check_term_value(trace, l, t);
+        double r_value = check_term_value(trace, r, t);  
+        return std::floor(l_value / r_value);
       }
     );
 
@@ -234,10 +268,10 @@ namespace black::frontend
     bool result = e.match(
       [&](equal, auto terms) {  
         int terms_size = terms.size();
-        auto first_value = 0;
+        double first_value = 0;
 
         for(int i = 0; i< terms_size; i++ ){
-          auto value = check_term_value(trace, terms[i], t);
+          double value = check_term_value(trace, terms[i], t);
 
           if(i == 0){
             first_value = value; // if it's the first cycle, initialize the variable with the first number
@@ -434,49 +468,39 @@ namespace black::frontend
 
         for(auto it = jstate.begin(); it != jstate.end(); ++it) {
           ValueType value = black::tribool::undef;
-           
-          try{
-            if(it.value().get<std::string>() == "undef")
-              value = black::tribool::undef;
-            else if(it.value().get<std::string>() == "true"){
-              black::tribool bool__val = true;
-              value = bool__val;
-            }else if(it.value().get<std::string>() == "false"){
-              black::tribool bool__val = false;
-              value = bool__val;
-            }
-          } catch(std::exception& e) {
-            try{ 
-              int it_value = it.value().get<int>();
-              if(cli::default_sort == "Real")
-                io::fatal(
-                  status_code::syntax_error, 
-                  "{}: found integer value in real domain",
-                  path
-                );
 
-              value = it_value;
-            }catch(std::exception& e) {
-              try{
-                double it_value = it.value().get<double>();  
-                io::println("double value: {}", it_value);
-                
-                if(cli::default_sort == "Int")
-                  io::fatal(
-                    status_code::syntax_error, 
-                    "{}: found real value in Int domain",
-                    path
-                  );
-                value = it_value;
-
-              } catch(std::exception& e) {
-                io::fatal(
+          if (it.value().is_number_float()){
+            double it_value = it.value().get<double>();
+            if(cli::default_sort == "Int" || cli::default_sort == "int"){
+              io::fatal(
                 status_code::syntax_error, 
-                "{}: invalid proposition value",
+                "{}: found real value in Int domain",
                 path
               );
-              }
             }
+            value = it_value;
+          } else if (it.value().is_number_integer() ){
+            if(cli::default_sort == "Int" || cli::default_sort == "int"){
+              int it_value = it.value().get<int>();
+              value = it_value;
+            } else {
+              double it_value = it.value().get<int>();
+              value = it_value;
+            }
+          } else if(it.value().get<std::string>() == "undef")
+            value = black::tribool::undef;
+          else if(it.value().get<std::string>() == "true"){
+            black::tribool bool__val = true;
+            value = bool__val;
+          }else if(it.value().get<std::string>() == "false"){
+            black::tribool bool__val = false;
+            value = bool__val;
+          } else {
+            io::fatal(
+              status_code::syntax_error, 
+              "{}: invalid proposition value",
+              path
+            );
           }
           
           state.insert({it.key(), value});
